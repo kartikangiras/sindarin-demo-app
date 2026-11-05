@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from app.orders import TooManyRows, export_csv, sample_orders
+from app.orders import export_orders, sample_orders
 
 ORDERS = sample_orders()
+
+TRUNCATED_HEADER = "X-Export-Truncated"
+ROWS_HEADER = "X-Export-Rows"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -14,16 +17,14 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != "/orders.csv":
             self.send_error(404)
             return
-        try:
-            body = export_csv(ORDERS).encode("utf-8")
-        except TooManyRows as exc:
-            self.send_response(413)
-            self.send_header("Content-Type", "text/plain")
-            self.end_headers()
-            self.wfile.write(str(exc).encode("utf-8"))
-            return
+        export = export_orders(ORDERS)
+        body = export.text.encode("utf-8")
         self.send_response(200)
-        self.send_header("Content-Type", "text/plain")  # SPEC-1 criterion 1 wants text/csv
+        self.send_header("Content-Type", "text/csv; charset=utf-8; header=present")
+        self.send_header("Content-Disposition", 'attachment; filename="orders.csv"')
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header(ROWS_HEADER, str(export.rows))
+        self.send_header(TRUNCATED_HEADER, "true" if export.truncated else "false")
         self.end_headers()
         self.wfile.write(body)
 

@@ -1,15 +1,15 @@
 # sindarin-demo-app
 
 The sample application the Sindarin demo builds a feature in (DDD §16.3, §18.1). A tiny
-orders service with one seeded feature to build: **CSV export of orders**. The endpoint is
-stubbed and its tests fail, so the `coder` agent's work is real and small.
+orders service with one seeded feature to build: **CSV export of orders**.
 
 Acceptance criteria (`SPEC-1`):
 
-1. `GET /orders.csv` returns `text/csv`
-2. a header row is present even when there are no orders
-3. exports above 10,000 rows return `413` with a message
-4. a test covers each of the above
+1. `GET /orders.csv` returns HTTP 200, `text/csv`, and a header row naming every order field
+2. each order produces exactly one data row whose values match the order
+3. above 10,000 orders the file has exactly 10,000 data rows and the response carries
+   `X-Export-Truncated: true` (and `X-Export-Rows: 10000`)
+4. values with commas, quotes or newlines are escaped per RFC 4180 and round-trip unchanged
 
 ## Put it on GitHub
 
@@ -39,5 +39,5 @@ branch protection, read-only.
 ## Run the tests
 
 ```
-uv run pytest -q     # 4 tests, all failing until the feature is built
+uv run pytest -q     # 11 tests covering SPEC-1 criteria 1-4
 ```
