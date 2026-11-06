@@ -5,11 +5,15 @@ orders service with one seeded feature to build: **CSV export of orders**.
 
 Acceptance criteria (`SPEC-1`):
 
-1. `GET /orders.csv` returns HTTP 200, `text/csv`, and a header row naming every order field
-2. each order produces exactly one data row whose values match the order
-3. above 10,000 orders the file has exactly 10,000 data rows and the response carries
-   `X-Export-Truncated: true` (and `X-Export-Rows: 10000`)
-4. values with commas, quotes or newlines are escaped per RFC 4180 and round-trip unchanged
+1. `GET /orders.csv` returns `text/csv` with `Content-Disposition: attachment; filename="orders.csv"`;
+   the orders page (`GET /orders`) carries the **Export CSV** action linking to it
+2. the first row is a header naming every order field; each later row holds one order with a
+   value for every column
+3. values with commas, quotes or newlines are escaped per RFC 4180 and round-trip unchanged
+4. an export of up to 10,000 orders succeeds with exactly that many data rows
+   (`X-Export-Rows` carries the count)
+5. above 10,000 orders the request fails fast with HTTP 422 and a plain-text message stating
+   the 10,000-row limit; no CSV, partial or truncated, is sent
 
 ## Put it on GitHub
 
@@ -39,5 +43,5 @@ branch protection, read-only.
 ## Run the tests
 
 ```
-uv run pytest -q     # 11 tests covering SPEC-1 criteria 1-4
+uv run pytest -q     # 13 tests covering SPEC-1 criteria 1-5
 ```

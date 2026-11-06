@@ -17,7 +17,7 @@ class Order:
     placed_at: str  # ISO date
 
 
-# Every order field, one column each, in declaration order (criterion 1).
+# Every order field, one column each, in declaration order (criterion 2).
 COLUMNS = tuple(f.name for f in fields(Order))
 
 
@@ -25,7 +25,18 @@ COLUMNS = tuple(f.name for f in fields(Order))
 class CsvExport:
     text: str
     rows: int
-    truncated: bool
+
+
+class ExportTooLarge(Exception):
+    """Raised before any CSV is built when a request exceeds the row limit (criterion 5)."""
+
+    def __init__(self, requested: int, limit: int = MAX_ROWS) -> None:
+        self.requested = requested
+        self.limit = limit
+        super().__init__(
+            f"Orders export is limited to {limit:,} rows; this request has {requested:,} orders. "
+            "Narrow the request and try again."
+        )
 
 
 def sample_orders(n: int = 3) -> list[Order]:
@@ -33,21 +44,22 @@ def sample_orders(n: int = 3) -> list[Order]:
 
 
 def export_orders(orders: list[Order], limit: int = MAX_ROWS) -> CsvExport:
-    """Orders as RFC 4180 CSV with a header row, capped at `limit` data rows.
+    """Orders as RFC 4180 CSV with a header row and one data row per order.
 
-    Above the cap the first `limit` orders are written and `truncated` is set (criterion 3).
-    The csv module quotes fields holding commas, quotes or newlines, doubles inner quotes and
-    ends records with CRLF (criterion 4).
+    More than `limit` orders raises `ExportTooLarge` up front: no partial or truncated file is
+    ever produced (criteria 4, 5). The csv module quotes fields holding commas, quotes or
+    newlines, doubles inner quotes and ends records with CRLF (criterion 3).
     """
-    kept = orders[:limit]
+    if len(orders) > limit:
+        raise ExportTooLarge(len(orders), limit)
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator="\r\n", quoting=csv.QUOTE_MINIMAL)
     writer.writerow(COLUMNS)
-    for order in kept:
+    for order in orders:
         writer.writerow(astuple(order))
-    return CsvExport(text=buf.getvalue(), rows=len(kept), truncated=len(orders) > limit)
+    return CsvExport(text=buf.getvalue(), rows=len(orders))
 
 
 def export_csv(orders: list[Order], limit: int = MAX_ROWS) -> str:
-    """CSV text only; see `export_orders` for the row count and truncation flag."""
+    """CSV text only; see `export_orders` for the row count and the limit."""
     return export_orders(orders, limit).text
