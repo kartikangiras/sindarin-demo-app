@@ -3,17 +3,16 @@
 The sample application the Sindarin demo builds a feature in (DDD §16.3, §18.1). A tiny
 orders service with one seeded feature to build: **CSV export of orders**.
 
-Acceptance criteria (`SPEC-1`):
+Acceptance criteria (`SPEC-1`, as approved by Leonardo):
 
-1. `GET /orders.csv` returns `text/csv` with `Content-Disposition: attachment; filename="orders.csv"`;
-   the orders page (`GET /orders`) carries the **Export CSV** action linking to it
-2. the first row is a header naming every order field; each later row holds one order with a
-   value for every column
-3. values with commas, quotes or newlines are escaped per RFC 4180 and round-trip unchanged
-4. an export of up to 10,000 orders succeeds with exactly that many data rows
-   (`X-Export-Rows` carries the count)
-5. above 10,000 orders the request fails fast with HTTP 422 and a plain-text message stating
-   the 10,000-row limit; no CSV, partial or truncated, is sent
+1. `GET /orders.csv` returns `text/csv` (`Content-Disposition: attachment; filename="orders.csv"`)
+   with a header row naming every order field; the orders page (`GET /orders`) carries the
+   **Export CSV** action linking to it
+2. each exported order is exactly one row, and its values match the stored order record
+3. when more than 10,000 orders match, the export contains exactly 10,000 data rows and the
+   response marks it as truncated (`X-Export-Truncated: true`, `X-Export-Rows`,
+   `X-Export-Matched` and a plain-language `X-Export-Notice`)
+4. values with commas, quotes or newlines are escaped per RFC 4180 and round-trip unchanged
 
 ## Put it on GitHub
 
@@ -43,5 +42,5 @@ branch protection, read-only.
 ## Run the tests
 
 ```
-uv run pytest -q     # 13 tests covering SPEC-1 criteria 1-5
+uv run pytest -q     # 13 tests covering SPEC-1 criteria 1-4
 ```

@@ -8,11 +8,14 @@ from __future__ import annotations
 import html
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from app.orders import COLUMNS, ExportTooLarge, export_orders, sample_orders
+from app.orders import COLUMNS, export_orders, sample_orders
 
 ORDERS = sample_orders()
 
 ROWS_HEADER = "X-Export-Rows"
+MATCHED_HEADER = "X-Export-Matched"
+TRUNCATED_HEADER = "X-Export-Truncated"
+NOTICE_HEADER = "X-Export-Notice"
 EXPORT_PATH = "/orders.csv"
 
 
@@ -49,20 +52,21 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != EXPORT_PATH:
             self.send_error(404)
             return
-        try:
-            export = export_orders(ORDERS)
-        except ExportTooLarge as err:
-            # Criterion 5: a clear error naming the limit, never a truncated file.
-            self._send(422, "text/plain; charset=utf-8", str(err).encode("utf-8"))
-            return
+        export = export_orders(ORDERS)
+        extra = [
+            ("Content-Disposition", 'attachment; filename="orders.csv"'),
+            (ROWS_HEADER, str(export.rows)),
+            (MATCHED_HEADER, str(export.matched)),
+            (TRUNCATED_HEADER, "true" if export.truncated else "false"),
+        ]
+        if export.truncated:
+            # Criterion 3: exactly MAX_ROWS data rows, and the response says it was truncated.
+            extra.append((NOTICE_HEADER, export.notice))
         self._send(
             200,
             "text/csv; charset=utf-8; header=present",
             export.text.encode("utf-8"),
-            extra=(
-                ("Content-Disposition", 'attachment; filename="orders.csv"'),
-                (ROWS_HEADER, str(export.rows)),
-            ),
+            extra=extra,
         )
 
 
