@@ -8,9 +8,12 @@ from __future__ import annotations
 import html
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-from app.orders import COLUMNS, export_orders, sample_orders
+from app.orders import COLUMNS, export_last_month, recent_sample_orders, utcnow
 
-ORDERS = sample_orders()
+ORDERS = recent_sample_orders()
+
+# The request clock; tests replace it to pin "now".
+now = utcnow
 
 ROWS_HEADER = "X-Export-Rows"
 MATCHED_HEADER = "X-Export-Matched"
@@ -52,15 +55,16 @@ class Handler(BaseHTTPRequestHandler):
         if self.path != EXPORT_PATH:
             self.send_error(404)
             return
-        export = export_orders(ORDERS)
+        # Criterion 2: only orders created in the 30 days before this request.
+        export = export_last_month(ORDERS, now())
         extra = [
+            # Criterion 1: a .csv attachment.
             ("Content-Disposition", 'attachment; filename="orders.csv"'),
             (ROWS_HEADER, str(export.rows)),
             (MATCHED_HEADER, str(export.matched)),
             (TRUNCATED_HEADER, "true" if export.truncated else "false"),
         ]
         if export.truncated:
-            # Criterion 3: exactly MAX_ROWS data rows, and the response says it was truncated.
             extra.append((NOTICE_HEADER, export.notice))
         self._send(
             200,
